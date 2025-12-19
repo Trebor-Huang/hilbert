@@ -118,9 +118,17 @@ mapping c =
   in
     (x ⊕ (ng <$> y), z ⊕ (ng <$> x ⊕ y))
 
+-- near k x n:
+--   outputs True if |n-x| < 2^(-k),
+--   outputs False if |n-x| >= 2^(-k+1),
+--   no guarantee otherwise
 near :: (Ord a, Fractional a) => Int -> Number -> a -> Bool
-near 0 _ n = abs n < 1
-near _ _ n | abs n >= 1 = False
+near (-1) _ n = abs n < 3
+near k _ n | abs n - 1 >= 3 = False
+
+-- near 0 _ n = abs n < 1
+-- near _ _ n | abs n >= 1 = False
+
 near k (P:x) n = near (k-1) x (n*2-1)
 near k (Z:x) n = near (k-1) x (n*2)
 near k (N:x) n = near (k-1) x (n*2+1)
@@ -128,45 +136,48 @@ near k (N:x) n = near (k-1) x (n*2+1)
 main :: IO ()
 main = finalResult `seq` withFile "./htest.pgm" WriteMode \handle -> do
   hPutStrLn handle "P2"
-  hPutStrLn handle (show (2*n+1) ++ " " ++ show (2*n+1))
+  hPutStrLn handle (show (2*n+1) ++ " " ++ show (2*m+1))
   hPutStrLn handle "255"
 
-  forM_ [-n..n] \iy -> do
+  forM_ [-m..m] \iy -> do
     forM_ [-n..n] \ix -> do
       hPutStr handle (show (finalResult ! (ix, iy)) ++ " ")
     hPutStrLn handle ""
 
 -- Resolution parameter, note that it's exponential and p=10 is about the limit
-p = 7 :: Int
+p = 6 :: Int
+q = 6 :: Int
 
 n = 2^(p-1) :: Int
+m = 2^(q-1) :: Int
 
-coord :: Int -> Rational
-coord i = fromIntegral i / fromIntegral (n*2)
+coord :: (Int, Int) -> (Rational, Rational)
+coord (i, j) =
+  (fromIntegral i / fromIntegral (n*2), fromIntegral j / fromIntegral (m*2))
 
 toColor :: Cantor -> Int
 -- simple coloring scheme
-toColor n = 100 + sum
-  (zipWith (\b i -> if b then 2^i else 0) (drop 2 n) [6,5,4,3,2,1,0])
+toColor x = 100 + sum
+  (zipWith (\b i -> if b then 2^i else 0) (drop 2 x) [6,5,4,3,2,1,0])
 
-computation (coord -> x') (coord -> y') =
+computation (coord -> (x', y')) =
   case search \c ->
-    let (x,y) = mapping c in near p x x' && near p y y' of
+    let (x,y) = mapping c in near (p+1) x x' && near (q+1) y y' of
     Just c -> toColor c
     Nothing -> if abs y' <= 1/2 - abs x' / 2 then 0 else 60
 
 -- Unsafe way to give a rough progress indication
 -- It's gonna be slightly out of order but who cares
-withProgress ix iy | iy == n = trace
+withProgress (ix, iy) | iy == m = trace
   (show (ix+n) ++ "/" ++ show (2*n+1))
-  (computation ix iy)
-withProgress ix iy = computation ix iy
+  (computation (ix, iy))
+withProgress p = computation p
 
 finalResult :: UArray (Int, Int) Int
 finalResult = unsafePerformIO do
   t <- getCurrentTime
-  let !result = listArray ((-n,-n), (n,n))
-        (map (uncurry withProgress) (range ((-n, -n), (n, n)))
+  let !result = listArray ((-n,-m), (n,m))
+        (map withProgress (range ((-n, -m), (n, m)))
           `using` parListChunk 64 rdeepseq)
   t' <- getCurrentTime
   print (diffUTCTime t' t)
