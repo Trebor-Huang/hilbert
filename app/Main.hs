@@ -178,7 +178,7 @@ n = 2^(p-1) :: Int
 m = 2^(q-1) :: Int
 
 coord :: (Int, Int) -> (Dyadic, Dyadic)
-coord (i, j) = (i :/^ p, j :/^ q)
+coord (i, j) = (i :/^ p, j :/^ q)  -- divides [-1/2, 1/2] into 2^p pieces
 {-# INLINE coord #-}
 
 toColor :: Cantor -> Int
@@ -187,11 +187,14 @@ toColor x = 100 + go 8 x
   where
     go n x | n < 0 = 0
     go n (_ :! x) | n > 6 = go (n-1) x
-    go n (b :! x) = go (n-1) x + (if b then 2^n else 0)
+    go n (True :! x) = go (n-1) x + shiftL 1 n
+    go n (False :! x) = go (n-1) x
 
 
 computation (coord -> (x', y')) =
   case search \c ->
+    -- since the pixel distance is 2^(-p),
+    -- we need 2^(-p-1) amount of guaranteed space
     let (x,y) = mapping c in near (p+1) x x' && near (q+1) y y' of
     Just c -> toColor c
     Nothing -> 0
