@@ -119,7 +119,7 @@ mapping c =
     x = fmap (unsafeCoerce.not) u
     y = unsafeCoerce v
     z = unsafeCoerce c
-  in
+  in  -- TODO more general angles, would need an efficient multiplication
     (x ⊕ (ng <$> y), z ⊕ (ng <$> (x ⊕ y)))
 
 data Dyadic = !Int :/^ !Int
@@ -154,7 +154,7 @@ near (-1) _ (n :/^ e) = abs n < shiftL 3 e
 near k _ (n :/^ e)
   | abs n >= shiftL 1 e + exp2 (e-k+1)
   = False
-
+near 0 _ (0 :/^ _) = True  -- seems to make it slightly faster
 near k (P:!x) n = near (k-1) x (decr (double n))
 near k (Z:!x) n = near (k-1) x (double n)
 near k (N:!x) n = near (k-1) x (incr (double n))
